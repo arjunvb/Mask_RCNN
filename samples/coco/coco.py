@@ -62,6 +62,7 @@ COCO_MODEL_PATH = "/data/coco/mask_rcnn_coco.h5"
 # through the command line argument --logs
 DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 DEFAULT_DATASET_YEAR = "2017"
+times = []
 
 ############################################################
 #  Configurations
@@ -366,6 +367,7 @@ def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=Non
         # Run detection
         t = time.time()
         r = model.detect([image], verbose=0)[0]
+        times.append(time.time() - t)
         t_prediction += (time.time() - t)
 
         # Convert results to COCO format
@@ -389,6 +391,7 @@ def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=Non
     print("Prediction time: {}. Average {}/image".format(
         t_prediction, t_prediction / len(image_ids)))
     print("Total time: ", time.time() - t_start)
+    print("Times per image: " + str(times))
 
 
 ############################################################
