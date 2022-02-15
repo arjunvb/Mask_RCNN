@@ -423,7 +423,7 @@ if __name__ == '__main__':
                         metavar="/path/to/logs/",
                         help='Logs and checkpoints directory (default=logs/)')
     parser.add_argument('--limit', required=False,
-                        default=100,
+                        default=500,
                         metavar="<image count>",
                         help='Images to use for evaluation (default=500)')
     parser.add_argument('--download', required=False,
@@ -501,7 +501,7 @@ if __name__ == '__main__':
         # Training - Stage 1
         print("Training network heads")
         model.train(dataset_train, dataset_val,
-                    learning_rate=config.LEARNING_RATE *5,
+                    learning_rate=config.LEARNING_RATE,
                     epochs=4, #40
                     layers='heads',
                     augmentation=augmentation)
@@ -510,7 +510,7 @@ if __name__ == '__main__':
         # Finetune layers from ResNet stage 4 and up
         print("Fine tune Resnet stage 4 and up")
         model.train(dataset_train, dataset_val,
-                    learning_rate=config.LEARNING_RATE *5,
+                    learning_rate=config.LEARNING_RATE,
                     epochs=12, #120
                     layers='4+',
                     augmentation=augmentation)
@@ -519,7 +519,7 @@ if __name__ == '__main__':
         # Fine tune all layers
         print("Fine tune all layers")
         model.train(dataset_train, dataset_val,
-                    learning_rate=config.LEARNING_RATE / 2,
+                    learning_rate=config.LEARNING_RATE / 10,
                     epochs=16, #160
                     layers='all',
                     augmentation=augmentation)
