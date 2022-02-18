@@ -1,41 +1,25 @@
-import os
+import matplotlib.pyplot as plt
+import numpy as np
 
-import tensorflow as tf
-from tensorflow import keras
-import coco
-from pycocotools.coco import COCO
+# create some randomly ddistributed data:
+data = np.random.randn(10000)
 
-class CarsConfig(Config):
-    NAME = "cars"
-    NUM_CLASSES = 1 + 1 # background + cars
+# sort the data:
+data_sorted = np.sort(data)
 
-config = CarsConfig()  # Don't forget to use this config while creating your model
-config.display()
+# calculate the proportional values of samples
+p = 1. * np.arange(len(data)) / (len(data) - 1)
 
-ct = COCO("/YourPathToCocoDataset/annotations/instances_train2014.json")
-ct.getCatIds(['sheep']) 
-# Sheep class' id is 20. You should run for person and use that id
+# plot the sorted data:
+fig = plt.figure()
+ax1 = fig.add_subplot(121)
+ax1.plot(p, data_sorted)
+ax1.set_xlabel('$p$')
+ax1.set_ylabel('$x$')
 
-COCO_DIR = "/YourPathToCocoDataset/"
-# This path has train2014, annotations and val2014 files in it
+ax2 = fig.add_subplot(122)
+ax2.plot(data_sorted, p)
+ax2.set_xlabel('$x$')
+ax2.set_ylabel('$p$')
 
-# Training dataset
-dataset_train = coco.CocoDataset()
-dataset_train.load_coco(COCO_DIR, "train", class_ids=[3])
-dataset_train.prepare()
-
-# Validation dataset
-dataset_val = coco.CocoDataset()
-dataset_val.load_coco(COCO_DIR, "val", class_ids=[3])
-dataset_val.prepare()
-
-# Create model in training mode
-model = modellib.MaskRCNN(mode="training", config=config, model_dir=MODEL_DIR)
-model.load_weights(COCO_MODEL_PATH, by_name=True, exclude=["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask"])
-# This COCO_MODEL_PATH is the path to the mask_rcnn_coco.h5 file in this repo
-
-model.train(dataset_train, dataset_val,
-    learning_rate=config.LEARNING_RATE, 
-    epochs=100, 
-    layers='heads')#You can also use 'all' to train all network.
-    
+fig.show()
