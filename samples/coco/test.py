@@ -22,4 +22,6 @@ ax2.plot(data_sorted, p)
 ax2.set_xlabel('$x$')
 ax2.set_ylabel('$p$')
 
-fig.show()
+plt.show()
+plt.ion()
+print("hi")

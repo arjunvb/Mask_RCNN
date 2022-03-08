@@ -32,6 +32,7 @@ import sys
 import time
 import numpy as np
 import imgaug  # https://github.com/aleju/imgaug (pip3 install imgaug)
+import csv 
 
 # Download and install the Python COCO tools from https://github.com/waleedka/coco
 # That's a fork from the original https://github.com/pdollar/coco with a bug
@@ -392,8 +393,12 @@ def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=Non
         t_prediction, t_prediction / len(image_ids)))
     print("Total time: ", time.time() - t_start)
     print("Times per image: " + str(times))
-
-
+    with open('times.csv', 'w') as f:
+        # create the csv writer
+        writer = csv.writer(f)
+        # write a row to the csv file
+        writer.writerow(str(times))
+    
 ############################################################
 #  Training
 ############################################################
