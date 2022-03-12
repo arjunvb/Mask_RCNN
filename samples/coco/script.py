@@ -45,6 +45,7 @@ def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=Non
         # Run detection
         t = time.time()
         r = model.detect([image], verbose=0)[0]
+    print("results: " + str(results))
 
 masks = ""
 
@@ -293,26 +294,25 @@ config.display()
 dataset_path = "/data/coco/dataset"
 model_path = "/data/mrcnn/optimize/coco20220215T0337/mask_rcnn_coco_0016.h5"
 
-dataset_val = CocoDataset()
-coco = dataset_val.load_coco(dataset_path, val_type = "val", year=2017, return_coco=True, auto_download=False, class_ids=[3])
-
 model = modellib.MaskRCNN(mode="inference", config=config, model_dir=model_path)
 
 model.load_weights(model_path, by_name=True, exclude=[ "mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask"])
 
-evaluate_coco(model, dataset_path, coco, "bbox", 0, None)
+dataset_val = CocoDataset()
+coco = dataset_val.load_coco(dataset_path, "val", year=2017, return_coco=True, auto_download=False, class_ids=[3])
+dataset_val.prepare()
+
+
+
+evaluate_coco(model, dataset_val, coco, "bbox", 0, None)
 
 
 
 
-
-
-'''
-image = open("car1.jpg")
-img = cv.imread('car1.jpg')
-class_ids = [3]
-class_names = ["", "", "", "car"]
-'''
+#image = open("car1.jpg")
+#img = cv.imread('car1.jpg')
+#class_ids = [3]
+#class_names = ["", "", "", "car"]
 
 #display_top_masks(img, mask, class_ids, class_names, limit=4)
 #draw_boxes(image, boxes=None, refined_boxes=None,masks=None, captions=None, visibilities=None,title="", ax=None)
