@@ -304,12 +304,16 @@ dataset_val.prepare()
 
 
 
-evaluate_coco(model, dataset_val, coco, "bbox", 0, None)
+#evaluate_coco(model, dataset_val, coco, "bbox", 0, None)
 
 
 
 
-#image = open("car1.jpg")
+
+image = open("car1.jpg")
+r = model.detect([image], verbose=0)[0]
+print(r)
+
 #img = cv.imread('car1.jpg')
 #class_ids = [3]
 #class_names = ["", "", "", "car"]
