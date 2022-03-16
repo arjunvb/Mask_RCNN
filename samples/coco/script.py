@@ -15,6 +15,14 @@ import shutil
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from pycocotools import mask as maskUtils
+sys.path.append('/../../')
+import matplotlib.pyplot as plt
+from tensorflow.compat.v1 import ConfigProto
+from tensorflow.compat.v1 import InteractiveSession
+
+config = ConfigProto()
+config.gpu_options.allow_growth = True
+session = InteractiveSession(config=config)
 
 
 #evaluate on single image
@@ -45,7 +53,7 @@ def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=Non
         # Run detection
         t = time.time()
         r = model.detect([image], verbose=0)[0]
-    print("results: " + str(results))
+    #print("results: " + str(results))
 
 masks = ""
 
@@ -282,6 +290,33 @@ class CocoDataset(utils.Dataset):
         m = maskUtils.decode(rle)
         return m
 
+def build_coco_results(dataset, image_ids, rois, class_ids, scores, masks):
+    """Arrange resutls to match COCO specs in http://cocodataset.org/#format
+    """
+    # If no results, return an empty list
+    if rois is None:
+        return []
+
+    results = []
+    for image_id in image_ids:
+        # Loop through detections
+        for i in range(rois.shape[0]):
+            #class_id = class_ids[i]
+            score = scores[i]
+            bbox = np.around(rois[i], 1)
+            mask = masks[:, :, i]
+
+            result = {
+                "image_id": image_id,
+                #"category_id": dataset.get_source_class_id(class_id, "coco"),
+                "bbox": [bbox[1], bbox[0], bbox[3] - bbox[1], bbox[2] - bbox[0]],
+                "score": score,
+                "segmentation": maskUtils.encode(np.asfortranarray(mask))
+            }
+            results.append(result)
+    return results
+
+
 class InferenceConfig(CocoConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
@@ -290,6 +325,117 @@ class InferenceConfig(CocoConfig):
     DETECTION_MIN_CONFIDENCE = 0
 config = InferenceConfig()
 config.display()
+
+def display_images(images, titles=None, cols=4, cmap=None, norm=None,
+                   interpolation=None):
+    """Display the given set of images, optionally with titles.
+    images: list or array of image tensors in HWC format.
+    titles: optional. A list of titles to display with each image.
+    cols: number of images per row
+    cmap: Optional. Color map to use. For example, "Blues".
+    norm: Optional. A Normalize instance to map values to colors.
+    interpolation: Optional. Image interpolation to use for display.
+    """
+    titles = titles if titles is not None else [""] * len(images)
+    rows = len(images) // cols + 1
+    plt.figure(figsize=(14, 14 * rows // cols))
+    i = 1
+    for image, title in zip(images, titles):
+        plt.subplot(rows, cols, i)
+        plt.title(title, fontsize=9)
+        plt.axis('off')
+        plt.imshow(image.astype(np.uint8), cmap=cmap,
+                   norm=norm, interpolation=interpolation)
+        i += 1
+    plt.savefig()
+
+
+def display_instances(image, boxes, masks, class_ids, class_names,
+                      scores=None, title="",
+                      figsize=(16, 16), ax=None,
+                      show_mask=True, show_bbox=True,
+                      colors=None, captions=None):
+    """
+    boxes: [num_instance, (y1, x1, y2, x2, class_id)] in image coordinates.
+    masks: [height, width, num_instances]
+    class_ids: [num_instances]
+    class_names: list of class names of the dataset
+    scores: (optional) confidence scores for each box
+    title: (optional) Figure title
+    show_mask, show_bbox: To show masks and bounding boxes or not
+    figsize: (optional) the size of the image
+    colors: (optional) An array or colors to use with each object
+    captions: (optional) A list of strings to use as captions for each object
+    """
+    # Number of instances
+    print(str(boxes))
+    N = boxes.shape[0]
+    if not N:
+        print("\n*** No instances to display *** \n")
+    else:
+        assert boxes.shape[0] == masks.shape[-1] == class_ids.shape[0]
+
+    # If no axis is passed, create one and automatically call show()
+    auto_show = False
+    if not ax:
+        _, ax = plt.subplots(1, figsize=figsize)
+        auto_show = True
+
+    # Generate random colors
+    colors = colors or random_colors(N)
+
+    # Show area outside image boundaries.
+    height, width = image.shape[:2]
+    ax.set_ylim(height + 10, -10)
+    ax.set_xlim(-10, width + 10)
+    ax.axis('off')
+    ax.set_title(title)
+
+    masked_image = image.astype(np.uint32).copy()
+    for i in range(N):
+        color = colors[i]
+
+        # Bounding box
+        if not np.any(boxes[i]):
+            # Skip this instance. Has no bbox. Likely lost in image cropping.
+            continue
+        y1, x1, y2, x2 = boxes[i]
+        if show_bbox:
+            p = patches.Rectangle((x1, y1), x2 - x1, y2 - y1, linewidth=2,
+                                alpha=0.7, linestyle="dashed",
+                                edgecolor=color, facecolor='none')
+            ax.add_patch(p)
+
+        # Label
+        if not captions:
+            class_id = class_ids[i]
+            score = scores[i] if scores is not None else None
+            label = class_names[class_id]
+            caption = "{} {:.3f}".format(label, score) if score else label
+        else:
+            caption = captions[i]
+        ax.text(x1, y1 + 8, caption,
+                color='w', size=11, backgroundcolor="none")
+
+        # Mask
+        mask = masks[:, :, i]
+        if show_mask:
+            masked_image = apply_mask(masked_image, mask, color)
+
+        # Mask Polygon
+        # Pad to ensure proper polygons for masks that touch image edges.
+        padded_mask = np.zeros(
+            (mask.shape[0] + 2, mask.shape[1] + 2), dtype=np.uint8)
+        padded_mask[1:-1, 1:-1] = mask
+        contours = find_contours(padded_mask, 0.5)
+        for verts in contours:
+            # Subtract the padding and flip (y, x) to (x, y)
+            verts = np.fliplr(verts) - 1
+            p = Polygon(verts, facecolor="none", edgecolor=color)
+            ax.add_patch(p)
+    ax.imshow(masked_image.astype(np.uint8))
+    if auto_show:
+        plt.show()
 
 dataset_path = "/data/coco/dataset"
 model_path = "/data/mrcnn/optimize/coco20220215T0337/mask_rcnn_coco_0016.h5"
@@ -306,21 +452,18 @@ dataset_val.prepare()
 
 #evaluate_coco(model, dataset_val, coco, "bbox", 0, None)
 
+img = cv.imread('car1.jpg')
+r = model.detect([img], verbose=0)[0]
+#print(r)
 
+class_ids = [3]
+class_names = ["", "", "", "car"]
 
-
-
-image = open("car1.jpg")
-r = model.detect([image], verbose=0)[0]
-print(r)
-
-#img = cv.imread('car1.jpg')
-#class_ids = [3]
-#class_names = ["", "", "", "car"]
+result = build_coco_results(dataset_val, img, r["rois"], class_ids, r["scores"], r["masks"])
 
 #display_top_masks(img, mask, class_ids, class_names, limit=4)
 #draw_boxes(image, boxes=None, refined_boxes=None,masks=None, captions=None, visibilities=None,title="", ax=None)
-#display_instances(img, boxes, masks, class_ids, class_names, scores=None, title="", figsize=(16, 16), ax=None,show_mask=True, show_bbox=True,colors=None, captions=None)
+display_instances(img, result[0]["bbox"], r["masks"], class_ids, class_names, r["scores"], title="", figsize=(16, 16), ax=None,show_mask=True, show_bbox=True,colors=None, captions=None)
 """
 boxes: [num_instance, (y1, x1, y2, x2, class_id)] in image coordinates.
 masks: [height, width, num_instances]
